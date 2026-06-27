@@ -1,11 +1,64 @@
 import { Bot } from "grammy";
+import sqlite3 from "sqlite3";
 
 const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN is not set");
 
 const bot = new Bot(token);
-let nextTaskId = 1;
-const customReplies: Array<{ id: number; keyword: string; reply: string }> = [];
+const db = new sqlite3.Database("custom-replies.db");
+
+type CustomReplyTask = {
+  id: number;
+  keyword: string;
+  reply: string;
+};
+
+function run(sql: string, params: Array<string | number> = []) {
+  return new Promise<{ lastID: number; changes: number }>((resolve, reject) => {
+    db.run(sql, params, function (error) {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+function get<T>(sql: string, params: Array<string | number> = []) {
+  return new Promise<T | undefined>((resolve, reject) => {
+    db.get(sql, params, (error, row) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(row as T | undefined);
+    });
+  });
+}
+
+function all<T>(sql: string, params: Array<string | number> = []) {
+  return new Promise<T[]>((resolve, reject) => {
+    db.all(sql, params, (error, rows) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(rows as T[]);
+    });
+  });
+}
+
+await run(`
+  CREATE TABLE IF NOT EXISTS custom_replies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword TEXT NOT NULL,
+    reply TEXT NOT NULL
+  )
+`);
 
 bot.command("start", (ctx) =>
   ctx.reply(
@@ -42,14 +95,17 @@ bot.command("add", async (ctx) => {
     return;
   }
 
-  const task = { id: nextTaskId, keyword, reply };
-  nextTaskId += 1;
-  customReplies.push(task);
+  const result = await run(
+    "INSERT INTO custom_replies (keyword, reply) VALUES (?, ?)",
+    [keyword, reply],
+  );
+
   await ctx.reply(
-    [`已添加任务 #${task.id}喵`,
-     `我看到“${keyword}”时会自动跟跳“${reply}”`,
-    ].join("\n")
-    );
+    [
+      `已添加任务 #${result.lastID}喵`,
+      `我看到“${keyword}”时会自动跟跳“${reply}”`,
+    ].join("\n"),
+  );
 });
 
 bot.command("del", async (ctx) => {
@@ -67,29 +123,31 @@ bot.command("del", async (ctx) => {
     return;
   }
 
-  const taskIndex = customReplies.findIndex((task) => task.id === taskId);
-  if (taskIndex === -1) {
+  const removedTask = await get<CustomReplyTask>(
+    "SELECT id, keyword, reply FROM custom_replies WHERE id = ?",
+    [taskId],
+  );
+
+  if (!removedTask) {
     await ctx.reply("这个ID不存在,你记错了喵。使用/list加载大脑恢复术");
     return;
   }
 
-  const removedTask = customReplies[taskIndex];
-  if (!removedTask) {
-    await ctx.reply("删除任务失败喵，请重试");
-    return;
-  }
-
-  customReplies.splice(taskIndex, 1);
+  await run("DELETE FROM custom_replies WHERE id = ?", [taskId]);
   await ctx.reply(`已删除任务喵 #${removedTask.id}：${removedTask.keyword}->${removedTask.reply}`);
 });
 
 bot.command("list", async (ctx) => {
-  if (customReplies.length === 0) {
+  const tasks = await all<CustomReplyTask>(
+    "SELECT id, keyword, reply FROM custom_replies ORDER BY id ASC",
+  );
+
+  if (tasks.length === 0) {
     await ctx.reply("还没有人设置跟调捏");
     return;
   }
 
-  const lines = customReplies.map(
+  const lines = tasks.map(
     (task) => `#${task.id} ${task.keyword} -> ${task.reply}`,
   );
   await ctx.reply(lines.join("\n"));
@@ -118,7 +176,11 @@ bot.on("message", async (ctx) => {
     return;
   }
 
-  for (const task of customReplies) {
+  const tasks = await all<CustomReplyTask>(
+    "SELECT id, keyword, reply FROM custom_replies ORDER BY id ASC",
+  );
+
+  for (const task of tasks) {
     if (text.includes(task.keyword)) {
       await ctx.reply(task.reply);
       return;
