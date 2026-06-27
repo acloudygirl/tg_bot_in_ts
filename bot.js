@@ -33,8 +33,8 @@ bot.command("add", async (ctx) => {
     const task = { id: nextTaskId, keyword, reply };
     nextTaskId += 1;
     customReplies.push(task);
-    await ctx.reply(["已添加任务 #${task.id}喵",
-        "我看到“${keyword}”时会自动跟跳“${reply}”",
+    await ctx.reply([`已添加任务 #${task.id}喵`,
+        `我看到“${keyword}”时会自动跟跳“${reply}”`,
     ].join("\n"));
 });
 bot.command("del", async (ctx) => {
@@ -64,7 +64,7 @@ bot.command("del", async (ctx) => {
 });
 bot.command("list", async (ctx) => {
     if (customReplies.length === 0) {
-        await ctx.reply("还没有人设置跟调目标");
+        await ctx.reply("还没有人设置跟调捏");
         return;
     }
     const lines = customReplies.map((task) => `#${task.id} ${task.keyword} -> ${task.reply}`);

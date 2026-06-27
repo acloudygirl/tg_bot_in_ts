@@ -46,8 +46,8 @@ bot.command("add", async (ctx) => {
   nextTaskId += 1;
   customReplies.push(task);
   await ctx.reply(
-    ["已添加任务 #${task.id}喵",
-     "我看到“${keyword}”时会自动跟跳“${reply}”",
+    [`已添加任务 #${task.id}喵`,
+     `我看到“${keyword}”时会自动跟跳“${reply}”`,
     ].join("\n")
     );
 });
