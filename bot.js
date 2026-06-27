@@ -64,7 +64,7 @@ bot.command("del", async (ctx) => {
 });
 bot.command("list", async (ctx) => {
     if (customReplies.length === 0) {
-        await ctx.reply("你还没有告诉我跟跳目标喵");
+        await ctx.reply("还没有人设置跟调目标");
         return;
     }
     const lines = customReplies.map((task) => `#${task.id} ${task.keyword} -> ${task.reply}`);
